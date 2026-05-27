@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kappa Test & 屬性量具分析 (Attribute Gage R&R) 綜合平台</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <!-- MathJax for LaTeX Rendering -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans TC', sans-serif;
+    }
+    .active-tab {
+      border-bottom-color: #4f46e5;
+      color: #4f46e5;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl">
+    <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="bg-indigo-600 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">MSA AIAG 標準</span>
+            <span class="text-xs text-indigo-300">版本 2.0 (基於上傳數據客製)</span>
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1">Kappa Test & 屬性量具分析平台</h1>
+          <p class="text-slate-300 text-sm mt-1">整合評審員重複性、再現性、漏檢率、誤警率與樣品庫管理之綜合診斷工具</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <!-- Quick CSV Import -->
+          <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow transition-all border border-emerald-500 flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            匯入 KAPPA.csv
+            <input type="file" id="csv_file_input" accept=".csv" class="hidden" onchange="handleCSVUpload(event)">
+          </label>
+          <button onclick="restoreDataset()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow transition-all border border-indigo-500">
+            📊 載入實測樣品數據
+          </button>
+          <button onclick="resetDataToEmpty()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold shadow transition-all border border-slate-600">
+            🔄 清空
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <nav class="flex space-x-8 -mb-px overflow-x-auto" aria-label="Tabs">
+        <button onclick="switchTab('tab-grr')" id="btn-tab-grr" class="border-b-2 border-transparent py-4 px-1 text-sm font-bold text-slate-500 hover:text-indigo-600 hover:border-slate-300 whitespace-nowrap active-tab flex items-center gap-2">
+          📊 屬性量具一致性分析 (Gage R&R)
+        </button>
+        <button onclick="switchTab('tab-samples')" id="btn-tab-samples" class="border-b-2 border-transparent py-4 px-1 text-sm font-bold text-slate-500 hover:text-indigo-600 hover:border-slate-300 whitespace-nowrap flex items-center gap-2">
+          📦 樣品庫管理 (Sample List)
+        </button>
+        <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="border-b-2 border-transparent py-4 px-1 text-sm font-bold text-slate-500 hover:text-indigo-600 hover:border-slate-300 whitespace-nowrap flex items-center gap-2">
+          📈 每日抽測記錄與人員能力 (Dashboard)
+        </button>
+        <button onclick="switchTab('tab-guide')" id="btn-tab-guide" class="border-b-2 border-transparent py-4 px-1 text-sm font-bold text-slate-500 hover:text-indigo-600 hover:border-slate-300 whitespace-nowrap flex items-center gap-2">
+          📖 統計說明指南 (Handbook)
+        </button>
+      </nav>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    
+    <!-- ==================== TAB 1: GAGE R&R ==================== -->
+    <div id="tab-grr" class="tab-content space-y-6">
+      
+      <!-- Summary Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Rater 甲 Card -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between relative overflow-hidden">
+          <div class="absolute -top-6 -right-6 w-20 h-20 bg-indigo-50 rounded-full opacity-50"></div>
+          <div class="relative">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full uppercase tracking-wider">評審員：甲</span>
+              <span id="rater_a_status" class="text-xs font-bold text-emerald-600">優良</span>
+            </div>
+            <div class="mt-4 flex items-baseline gap-2">
+              <span class="text-4xl font-extrabold text-slate-900 tracking-tight" id="rater_a_kappa">0.8250</span>
+              <span class="text-sm font-semibold text-slate-400">Kappa (κ)</span>
+            </div>
+            <!-- Performance metrics list -->
+            <div class="mt-4 space-y-2 text-xs border-t border-slate-100 pt-3 text-slate-600">
+              <div class="flex justify-between">
+                <span>有效性 (與標準100%符合率):</span>
+                <span id="rater_a_eff" class="font-bold text-slate-900">92.0%</span>
+              </div>
+              <div class="flex justify-between">
+                <span>失誤率 (漏檢 NG / 偽陰性):</span>
+                <span id="rater_a_miss" class="font-bold text-rose-600">5.3%</span>
+              </div>
+              <div class="flex justify-between">
+                <span>誤警率 (錯判 OK / 偽陽性):</span>
+                <span id="rater_a_alarm" class="font-bold text-amber-600">2.1%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rater 乙 Card -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between relative overflow-hidden">
+          <div class="absolute -top-6 -right-6 w-20 h-20 bg-emerald-50 rounded-full opacity-50"></div>
+          <div class="relative">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">評審員：乙</span>
+              <span id="rater_b_status" class="text-xs font-bold text-amber-600">邊界可接受</span>
+            </div>
+            <div class="mt-4 flex items-baseline gap-2">
+              <span class="text-4xl font-extrabold text-slate-900 tracking-tight" id="rater_b_kappa">0.7140</span>
+              <span class="text-sm font-semibold text-slate-400">Kappa (κ)</span>
+            </div>
+            <div class="mt-4 space-y-2 text-xs border-t border-slate-100 pt-3 text-slate-600">
+              <div class="flex justify-between">
+                <span>有效性 (與標準100%符合率):</span>
+                <span id="rater_b_eff" class="font-bold text-slate-900">80.0%</span>
+              </div>
+              <div class="flex justify-between">
+                <span>失誤率 (漏檢 NG / 偽陰性):</span>
+                <span id="rater_b_miss" class="font-bold text-rose-600">10.5%</span>
+              </div>
+              <div class="flex justify-between">
+                <span>誤警率 (錯判 OK / 偽陽性):</span>
+                <span id="rater_b_alarm" class="font-bold text-amber-600">8.3%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rater 丙 Card -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between relative overflow-hidden">
+          <div class="absolute -top-6 -right-6 w-20 h-20 bg-rose-50 rounded-full opacity-50"></div>
+          <div class="relative">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full uppercase tracking-wider">評審員：丙</span>
+              <span id="rater_c_status" class="text-xs font-bold text-rose-600">需要重新培訓</span>
+            </div>
+            <div class="mt-4 flex items-baseline gap-2">
+              <span class="text-4xl font-extrabold text-slate-900 tracking-tight" id="rater_c_kappa">0.4500</span>
+              <span class="text-sm font-semibold text-slate-400">Kappa (κ)</span>
+            </div>
+            <div class="mt-4 space-y-2 text-xs border-t border-slate-100 pt-3 text-slate-600">
+              <div class="flex justify-between">
+                <span>有效性 (與標準100%符合率):</span>
+                <span id="rater_c_eff" class="font-bold text-slate-900">60.0%</span>
+              </div>
+              <div class="flex justify-between">
+                <span>失誤率 (漏檢 NG / 偽陰性):</span>
+                <span id="rater_c_miss" class="font-bold text-rose-600">21.1%</span>
+              </div>
+              <div class="flex justify-between">
+                <span>誤警率 (錯判 OK / 偽陽性):</span>
+                <span id="rater_c_alarm" class="font-bold text-amber-600">16.7%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Gage Table & Side Analyses -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left 7 Cols: Interactive Sample Matrix -->
+        <div class="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div>
+              <h2 class="text-lg font-bold text-slate-800">1. 評估員實測重複試驗矩陣</h2>
+              <p class="text-xs text-slate-500 mt-0.5">點擊單元格中的數值可在 <span class="bg-emerald-50 text-emerald-800 px-1 rounded">0 (Pass/合格)</span> 與 <span class="bg-rose-50 text-rose-800 px-1 rounded">1 (Fail/不合格)</span> 之間快速切換</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="addRow()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                ➕ 增加樣品
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse" id="main-data-table">
+              <thead>
+                <tr class="bg-slate-100/50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+                  <th class="p-3 text-center w-12">編號</th>
+                  <th class="p-3 text-center border-r border-slate-200 bg-slate-100/30">樣品ID</th>
+                  <th colspan="3" class="p-3 text-center border-r border-slate-200 bg-indigo-50/30 text-indigo-900">甲 (Rater A)</th>
+                  <th colspan="3" class="p-3 text-center border-r border-slate-200 bg-emerald-50/30 text-emerald-900">乙 (Rater B)</th>
+                  <th colspan="3" class="p-3 text-center border-r border-slate-200 bg-rose-50/30 text-rose-900">丙 (Rater C)</th>
+                  <th class="p-3 text-center bg-slate-900 text-white rounded-tr-md">標準 (STD)</th>
+                  <th class="p-3 text-center w-10">操作</th>
+                </tr>
+                <tr class="bg-slate-50/60 text-[10px] text-slate-400 font-semibold border-b border-slate-100">
+                  <th></th>
+                  <th class="border-r border-slate-200"></th>
+                  <th class="p-1 text-center bg-indigo-50/20">試 1</th>
+                  <th class="p-1 text-center bg-indigo-50/20">試 2</th>
+                  <th class="p-1 text-center border-r border-slate-200 bg-indigo-50/20">試 3</th>
+                  <th class="p-1 text-center bg-emerald-50/20">試 1</th>
+                  <th class="p-1 text-center bg-emerald-50/20">試 2</th>
+                  <th class="p-1 text-center border-r border-slate-200 bg-emerald-50/20">試 3</th>
+                  <th class="p-1 text-center bg-rose-50/20">試 1</th>
+                  <th class="p-1 text-center bg-rose-50/20">試 2</th>
+                  <th class="p-1 text-center border-r border-slate-200 bg-rose-50/20">試 3</th>
+                  <th class="p-1 text-center bg-slate-800 text-slate-200">基準值</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-sm font-medium" id="data-table-body">
+                <!-- Javascript will render 30 rows here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Right 4 Cols: 2x2 Crosstab Matrix Breakdown -->
+        <div class="lg:col-span-4 space-y-6">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+              <h3 class="text-base font-bold text-slate-800">2. 評審員與標準列聯表</h3>
+              <select id="select-crosstab-rater" onchange="renderCrosstabs()" class="text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 font-semibold text-slate-600 outline-none">
+                <option value="A">評審員: 甲 vs STD</option>
+                <option value="B">評審員: 乙 vs STD</option>
+                <option value="C">評審員: 丙 vs STD</option>
+              </select>
+            </div>
+
+            <!-- Crosstab rendering block -->
+            <div class="space-y-4">
+              <div class="overflow-x-auto">
+                <table class="w-full text-center border-collapse text-xs">
+                  <thead>
+                    <tr>
+                      <th class="w-1/4"></th>
+                      <th colspan="2" class="p-2 bg-indigo-50 text-indigo-950 font-bold border-b border-slate-200 rounded-t-lg">標準值 (Standard)</th>
+                      <th class="w-1/4"></th>
+                    </tr>
+                    <tr>
+                      <th class="p-2 text-left font-bold text-slate-500" id="cross_rater_name">評審員 甲</th>
+                      <th class="p-2 bg-slate-50 font-bold text-slate-600">0 (OK)</th>
+                      <th class="p-2 bg-slate-50 font-bold text-slate-600">1 (NG)</th>
+                      <th class="p-2 font-bold text-slate-400">總計</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="border-b border-slate-100">
+                      <td class="p-3 text-left font-bold bg-slate-50">0 (OK)</td>
+                      <td class="p-3 font-extrabold text-slate-800 bg-emerald-50/20" id="cross_00">0</td>
+                      <td class="p-3 font-extrabold text-rose-600 bg-rose-50/10" id="cross_01">0</td>
+                      <td class="p-3 font-bold text-slate-500" id="cross_row0_sum">0</td>
+                    </tr>
+                    <tr class="border-b border-slate-100">
+                      <td class="p-3 text-left font-bold bg-slate-50">1 (NG)</td>
+                      <td class="p-3 font-extrabold text-amber-600 bg-yellow-50/10" id="cross_10">0</td>
+                      <td class="p-3 font-extrabold text-slate-800 bg-emerald-50/20" id="cross_11">0</td>
+                      <td class="p-3 font-bold text-slate-500" id="cross_row1_sum">0</td>
+                    </tr>
+                    <tr class="bg-slate-100/30">
+                      <td class="p-2 text-left font-bold text-slate-400">總計</td>
+                      <td class="p-2 font-bold text-slate-500" id="cross_col0_sum">0</td>
+                      <td class="p-2 font-bold text-slate-500" id="cross_col1_sum">0</td>
+                      <td class="p-2 font-extrabold text-indigo-800" id="cross_total_sum">0</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Crosstab Explainer Indicators -->
+              <div class="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div>
+                  <span class="text-slate-400 block font-semibold">正確檢出 (d):</span>
+                  <span class="font-bold text-slate-800" id="lbl_tp">0</span> 次
+                </div>
+                <div>
+                  <span class="text-slate-400 block font-semibold">正確釋放 (a):</span>
+                  <span class="font-bold text-slate-800" id="lbl_tn">0</span> 次
+                </div>
+                <div class="mt-1">
+                  <span class="text-slate-400 block font-semibold">漏檢失誤 (c):</span>
+                  <span class="font-bold text-rose-600" id="lbl_fn">0</span> 次
+                </div>
+                <div class="mt-1">
+                  <span class="text-slate-400 block font-semibold">錯判誤警 (b):</span>
+                  <span class="font-bold text-amber-600" id="lbl_fp">0</span> 次
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Academic Standards Guide Widget -->
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <h3 class="text-sm font-bold text-slate-800 mb-3">AIAG Attribute GR&R 標準判定</h3>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between items-center p-2 rounded bg-emerald-50 text-emerald-800">
+                <span class="font-bold">Kappa &gt; 0.75</span>
+                <span>系統完全可接受 (優良)</span>
+              </div>
+              <div class="flex justify-between items-center p-2 rounded bg-amber-50 text-amber-800">
+                <span class="font-bold">0.40 ≤ Kappa ≤ 0.75</span>
+                <span>臨界區 (須提供改善計畫)</span>
+              </div>
+              <div class="flex justify-between items-center p-2 rounded bg-rose-50 text-rose-800">
+                <span class="font-bold">Kappa &lt; 0.40</span>
+                <span>系統不合格 (需要全面改善)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Advanced Calculations & Mathematical Walkthrough -->
+      <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100">
+        <h3 class="text-lg font-bold text-slate-800 mb-6 pb-2 border-b border-slate-100 flex items-center gap-2">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+          Gage R&R 統計計算步驟詳解
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-slate-600">
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+            <h4 class="font-bold text-slate-800 text-sm">步驟 1: 觀測符合率 $P_o$</h4>
+            <p>評審員在 3 輪重複試驗中的每一個判斷（即總試驗次數 $N \times 3$）與標準值相同的總次數比例。</p>
+            <div class="bg-white p-3 rounded border border-slate-100 font-mono text-[11px]" id="calc_po_box">
+              $$P_o = \frac{\text{正確判斷總次數}}{3 \times N}$$
+            </div>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+            <h4 class="font-bold text-slate-800 text-sm">步驟 2: 隨機期望符合率 $P_e$</h4>
+            <p>雙方因偶然機會造成的偶然一致期望率。由評審員判定比例與標準值實際比例的邊際和求得。</p>
+            <div class="bg-white p-3 rounded border border-slate-100 font-mono text-[11px]" id="calc_pe_box">
+              $$P_e = P_{e(Pass)} + P_{e(Fail)}$$
+            </div>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+            <h4 class="font-bold text-slate-800 text-sm">步驟 3: 計算 Kappa ($\kappa$)</h4>
+            <p>求得 Kappa 以客觀排除隨機符合。當大於 0.75 則具備良好的一致再現性。</p>
+            <div class="bg-white p-3 rounded border border-slate-100 font-mono text-[11px]" id="calc_kappa_box">
+              $$\kappa = \frac{P_o - P_e}{1 - P_e}$$
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==================== TAB 2: SAMPLE LIST ==================== -->
+    <div id="tab-samples" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">樣品庫檔案管理 (Sample Library)</h2>
+            <p class="text-xs text-slate-500 mt-1">此庫存管理系統對應您上傳的 <strong>`Sample_List.csv`</strong> 數據格式</p>
+          </div>
+          <button onclick="addNewSample()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-all flex items-center gap-1">
+            ➕ 錄入新樣品
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                <th class="p-4">專案名稱</th>
+                <th class="p-4">樣品編號</th>
+                <th class="p-4">不良類型</th>
+                <th class="p-4">難度等級</th>
+                <th class="p-4">樣品特徵描述</th>
+                <th class="p-4">當前在庫狀態</th>
+                <th class="p-4 text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="sample-list-body" class="text-sm text-slate-700 divide-y divide-slate-100">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: DAILY TEST LOGS & DASHBOARD ==================== -->
+    <div id="tab-logs" class="tab-content hidden space-y-6">
+      
+      <!-- Personnel Dashboard Header -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <h2 class="text-lg font-bold text-slate-800 mb-2">檢驗員實操能力儀表板 (Dashboard)</h2>
+        <p class="text-xs text-slate-500 mb-6">數據彙整自 <strong>`Dashboard.csv`</strong> 與 <strong>`Test_Log.csv`</strong>，評估日常與盲測的實施成效。</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="dashboard-personnel-grid">
+          <!-- Dynamically populated personnel scorecards -->
+        </div>
+      </div>
+
+      <!-- Test Log Data Table -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-slate-800">每日測試與抽檢記錄流水帳 (Test Log)</h2>
+            <p class="text-xs text-slate-500 mt-1">用於登錄盲測檢驗結果並提供持續的人員分析數據</p>
+          </div>
+          <button onclick="addNewTestLog()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-all">
+            📝 新增抽測記錄
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-bold uppercase">
+                <th class="p-4">測試日期</th>
+                <th class="p-4">檢驗員姓名</th>
+                <th class="p-4">測試時段</th>
+                <th class="p-4">投入樣品ID</th>
+                <th class="p-4">樣品缺陷類型</th>
+                <th class="p-4">測試結果 (1=檢出, 0=漏檢)</th>
+                <th class="p-4">是否回收</th>
+                <th class="p-4">現場備註</th>
+              </tr>
+            </thead>
+            <tbody id="test-log-body" class="text-sm text-slate-700 divide-y divide-slate-100">
+              <!-- Dynamically populated logs -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==================== TAB 4: HANDBOOK ==================== -->
+    <div id="tab-guide" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+        <div>
+          <h2 class="text-xl font-extrabold text-slate-900">學術指標對照與判定指南</h2>
+          <p class="text-xs text-slate-500 mt-1">對應 <strong>`kappa test說明.csv`</strong> 的官方判定原則</p>
+        </div>
+
+        <div class="prose prose-slate max-w-none text-sm text-slate-600 space-y-4">
+          <h3 class="text-base font-bold text-slate-800 border-b border-slate-100 pb-2">1. 什麼是 Cohen's Kappa 檢定？</h3>
+          <p>
+            在統計學中，當兩名評審對同一組項目做出分類評分時，必然會存在部分「純屬巧合碰巧一致」的判定。
+            Cohen's Kappa 係數透過嚴密的公式設計，扣除這種隨機率，以衡量真實的判定一致性，這在工業製造品質抽檢（Gage R&R）、醫事診斷判定能力（Medical Diagnostics Consistency）中是公認的黃金標準。
+          </p>
+
+          <h3 class="text-base font-bold text-slate-800 border-b border-slate-100 pb-2">2. κ 一致性指標官方說明對照表</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border border-slate-100 rounded-lg">
+              <thead>
+                <tr class="bg-slate-50 text-xs font-bold text-slate-600">
+                  <th class="p-3 border-b border-slate-200">κ 值範圍</th>
+                  <th class="p-3 border-b border-slate-200">一致性程度詮釋</th>
+                  <th class="p-3 border-b border-slate-200">工業與醫學領域實務解讀</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-xs">
+                <tr>
+                  <td class="p-3 font-bold text-emerald-700 bg-emerald-50/20">+1.00</td>
+                  <td class="p-3 font-semibold">完全一致</td>
+                  <td class="p-3">兩位評分者的判斷或與標準完全百分百相同。極為完美。</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-indigo-700">&gt; 0.75</td>
+                  <td class="p-3 font-semibold">優良 / 高度一致</td>
+                  <td class="p-3">通常被視為量測系統或評分判定可被學術與品管部門接受的良好門檻。</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-amber-600">0.40 – 0.75</td>
+                  <td class="p-3 font-semibold">中度 / 臨界一致</td>
+                  <td class="p-3">代表判定存在明顯的人為判斷偏差或標準模糊，判定員需加強 SOP 對齊或重新制定限界樣品。</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-rose-600">0 – 0.39</td>
+                  <td class="p-3 font-semibold">微弱一致</td>
+                  <td class="p-3">檢測系統判定品質極不穩定。判定與硬幣投擲的隨機結果差不多，系統不可用。</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-slate-500">0.00</td>
+                  <td class="p-3 font-semibold">隨機一致</td>
+                  <td class="p-3">兩位評分者的一致程度僅僅與偶然預期一致相同，代表判斷不具實質價值。</td>
+                </tr>
+                <tr>
+                  <td class="p-3 font-bold text-slate-900">&lt; 0.00</td>
+                  <td class="p-3 font-semibold">低於隨機 (極少見)</td>
+                  <td class="p-3">兩位評分者的判斷呈現反向一致性或極大偏誤。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3 class="text-base font-bold text-slate-800 border-b border-slate-100 pb-2">3. 其他關鍵評價指標定義</h3>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>
+              <strong>有效性 (Effectiveness)</strong>: 判定員在該項目的多輪試驗（重複性）中，**所有輪次與標準值完全相同**的項目比例。
+              $$\text{有效性} = \frac{\text{所有試驗皆與標準一致的樣品數}}{\text{總樣品數}}$$
+            </li>
+            <li>
+              <strong>漏檢率 (Miss Rate)</strong>: 當樣品標準值為不合格（NG），判定員卻錯誤判定為合格（OK）的比例。
+              $$\text{漏檢率} = \frac{\text{NG 樣品被判為 OK 的次數}}{\text{NG 樣品總測試次數}}$$
+            </li>
+            <li>
+              <strong>誤警率 (False Alarm Rate)</strong>: 當樣品標準值為合格（OK），判定員卻錯誤地判斷為不良（NG）的次數比例。
+              $$\text{誤警率} = \frac{\text{OK 樣品被判為 NG 的次數}}{\text{OK 樣品總測試次數}}$$
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 py-8 mt-12 border-t border-slate-800 text-center text-xs space-y-1">
+    <p>本平台完全運行於使用者端（Client-side），符合機密資料處理規範。</p>
+    <p>© 2026 Kappa Test & MSA 屬性量具評估分析綜合平台 • 基於 AIAG 指南客製化設計</p>
+  </footer>
+
+  <!-- Notification Banner -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 translate-y-24 opacity-0 transition-all duration-300 z-50">
+    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0"></path></svg>
+    <span id="toast-message" class="text-sm font-medium">複製成功！</span>
+  </div>
+
+  <script>
+    // State management for raw items (preloaded based on user's actual KAPPA dataset structure)
+    let kappaItems = [];
+    
+    // Sample List DB
+    let sampleLibrary = [
+      { project: "專案A", id: "NG-001", type: "表面刮傷", diff: "A (明顯)", desc: "正面右下角長刮痕", status: "在庫" },
+      { project: "專案A", id: "NG-002", type: "尺寸過長", diff: "C (隱蔽)", desc: "超出公差 0.05mm", status: "測試中" },
+      { project: "專案A", id: "NG-003", type: "混料",     diff: "B (一般)", desc: "顏色偏深", status: "在庫" },
+      { project: "專案B", id: "NG-004", type: "表面刮傷", diff: "A (明顯)", desc: "正面右下角長刮痕", status: "在庫" },
+      { project: "專案B", id: "NG-005", type: "尺寸過長", diff: "C (隱蔽)", desc: "超出公差 0.05mm", status: "測試中" },
+      { project: "專案B", id: "NG-006", type: "混料",     diff: "B (一般)", desc: "顏色偏深", status: "在庫" }
+    ];
+
+    // Daily test logs (based on Test_Log)
+    let testLogs = [
+      { date: "2025/12/01", name: "王大明", time: "10:00", sampleId: "NG-002", type: "尺寸過長", result: 0, recycle: "OK", remark: "漏檢，已現場指導" },
+      { date: "2025/12/02", name: "李小美", time: "14:00", sampleId: "NG-001", type: "表面刮傷", result: 1, recycle: "OK", remark: "反應迅速，特徵清晰" }
+    ];
+
+    // Active Tab tracking
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+
+      // Update Nav highlighting
+      document.querySelectorAll('nav button').forEach(el => el.classList.remove('active-tab'));
+      let targetBtn = "btn-" + tabId;
+      if (document.getElementById(targetBtn)) {
+        document.getElementById(targetBtn).classList.add('active-tab');
+      }
+    }
+
+    // Default template dataset matching the uploaded KAPPA test results
+    function restoreDataset() {
+      kappaItems = [
+        { item: 1,  id: "S-01", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 2,  id: "S-02", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 },
+        { item: 3,  id: "S-03", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 4,  id: "S-04", a: [0,0,0], b: [0,0,0], c: [0,0,1], std: 0 },
+        { item: 5,  id: "S-05", a: [1,1,1], b: [1,1,1], c: [1,0,1], std: 1 },
+        { item: 6,  id: "S-06", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 },
+        { item: 7,  id: "S-07", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 8,  id: "S-08", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 },
+        { item: 9,  id: "S-09", a: [1,1,1], b: [1,1,1], c: [1,0,0], std: 1 },
+        { item: 10, id: "S-10", a: [0,0,0], b: [0,0,1], c: [0,1,0], std: 0 },
+        { item: 11, id: "S-11", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 12, id: "S-12", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 },
+        { item: 13, id: "S-13", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 14, id: "S-14", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 },
+        { item: 15, id: "S-15", a: [1,1,1], b: [1,1,1], c: [0,1,1], std: 1 },
+        { item: 16, id: "S-16", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 },
+        { item: 17, id: "S-17", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 18, id: "S-18", a: [0,0,0], b: [0,0,0], c: [0,1,1], std: 0 },
+        { item: 19, id: "S-19", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 20, id: "S-20", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 },
+        { item: 21, id: "S-21", a: [1,1,1], b: [1,1,1], c: [0,1,0], std: 1 },
+        { item: 22, id: "S-22", a: [0,0,0], b: [0,0,1], c: [0,0,0], std: 0 },
+        { item: 23, id: "S-23", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 24, id: "S-24", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 },
+        { item: 25, id: "S-25", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 26, id: "S-26", a: [0,0,0], b: [0,1,0], c: [0,1,0], std: 0 },
+        { item: 27, id: "S-27", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 28, id: "S-28", a: [0,0,0], b: [0,0,0], c: [1,0,0], std: 0 },
+        { item: 29, id: "S-29", a: [1,1,1], b: [1,1,1], c: [1,1,1], std: 1 },
+        { item: 30, id: "S-30", a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0 }
+      ];
+      renderMainMatrix();
+      recalculateGRR();
+      showToast("✓ 實測樣品數據載入完成！");
+    }
+
+    function resetDataToEmpty() {
+      kappaItems = [];
+      for (let i = 1; i <= 10; i++) {
+        kappaItems.push({
+          item: i, id: `S-${i < 10 ? '0'+i : i}`,
+          a: [0,0,0], b: [0,0,0], c: [0,0,0], std: 0
+        });
+      }
+      renderMainMatrix();
+      recalculateGRR();
+      showToast("✓ 表格數據已重置。");
+    }
+
+    // Add a single item row to the matrix
+    function addRow() {
+      let nextNum = kappaItems.length + 1;
+      kappaItems.push({
+        item: nextNum,
+        id: `S-${nextNum < 10 ? '0'+nextNum : nextNum}`,
+        a: [0,0,0], b: [0,0,0], c: [0,0,0],
+        std: 0
+      });
+      renderMainMatrix();
+      recalculateGRR();
+    }
+
+    // Delete a row
+    function deleteRow(idx) {
+      kappaItems.splice(idx, 1);
+      // Re-index
+      kappaItems.forEach((it, i) => it.item = i + 1);
+      renderMainMatrix();
+      recalculateGRR();
+    }
+
+    // Render the interactive data table
+    function renderMainMatrix() {
+      const tbody = document.getElementById('data-table-body');
+      tbody.innerHTML = '';
+
+      kappaItems.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 border-b border-slate-100 transition-colors";
+        
+        let valClass = (val) => val === 1 
+          ? "bg-rose-100 text-rose-800 hover:bg-rose-200" 
+          : "bg-emerald-100 text-emerald-800 hover:bg-emerald-200";
+
+        tr.innerHTML = `
+          <td class="p-3 text-center text-xs text-slate-400 font-mono">${row.item}</td>
+          <td class="p-3 text-center border-r border-slate-200 font-bold bg-slate-50 text-slate-700">${row.id}</td>
+          
+          <!-- Rater 甲 (A) -->
+          <td class="p-2 text-center bg-indigo-50/10">
+            <button onclick="toggleCell(${idx}, 'a', 0)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.a[0])}">${row.a[0]}</button>
+          </td>
+          <td class="p-2 text-center bg-indigo-50/10">
+            <button onclick="toggleCell(${idx}, 'a', 1)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.a[1])}">${row.a[1]}</button>
+          </td>
+          <td class="p-2 text-center border-r border-slate-200 bg-indigo-50/10">
+            <button onclick="toggleCell(${idx}, 'a', 2)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.a[2])}">${row.a[2]}</button>
+          </td>
+
+          <!-- Rater 乙 (B) -->
+          <td class="p-2 text-center bg-emerald-50/10">
+            <button onclick="toggleCell(${idx}, 'b', 0)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.b[0])}">${row.b[0]}</button>
+          </td>
+          <td class="p-2 text-center bg-emerald-50/10">
+            <button onclick="toggleCell(${idx}, 'b', 1)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.b[1])}">${row.b[1]}</button>
+          </td>
+          <td class="p-2 text-center border-r border-slate-200 bg-emerald-50/10">
+            <button onclick="toggleCell(${idx}, 'b', 2)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.b[2])}">${row.b[2]}</button>
+          </td>
+
+          <!-- Rater 丙 (C) -->
+          <td class="p-2 text-center bg-rose-50/10">
+            <button onclick="toggleCell(${idx}, 'c', 0)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.c[0])}">${row.c[0]}</button>
+          </td>
+          <td class="p-2 text-center bg-rose-50/10">
+            <button onclick="toggleCell(${idx}, 'c', 1)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.c[1])}">${row.c[1]}</button>
+          </td>
+          <td class="p-2 text-center border-r border-slate-200 bg-rose-50/10">
+            <button onclick="toggleCell(${idx}, 'c', 2)" class="w-8 py-1 rounded font-bold text-xs ${valClass(row.c[2])}">${row.c[2]}</button>
+          </td>
+
+          <!-- Standard (STD) -->
+          <td class="p-2 text-center bg-slate-100">
+            <button onclick="toggleSTD(${idx})" class="w-12 py-1.5 rounded font-extrabold text-sm ${row.std === 1 ? 'bg-red-500 text-white' : 'bg-slate-700 text-slate-100'}">${row.std === 1 ? 'NG (1)' : 'OK (0)'}</button>
+          </td>
+
+          <!-- Actions -->
+          <td class="p-2 text-center">
+            <button onclick="deleteRow(${idx})" class="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50">
+              ✕
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Toggle logic
+    function toggleCell(rowIdx, raterKey, trialIdx) {
+      kappaItems[rowIdx][raterKey][trialIdx] = kappaItems[rowIdx][raterKey][trialIdx] === 1 ? 0 : 1;
+      renderMainMatrix();
+      recalculateGRR();
+    }
+
+    function toggleSTD(rowIdx) {
+      kappaItems[rowIdx].std = kappaItems[rowIdx].std === 1 ? 0 : 1;
+      renderMainMatrix();
+      recalculateGRR();
+    }
+
+    // Main Gage R&R Calculation Logic
+    function recalculateGRR() {
+      const n = kappaItems.length;
+      if (n === 0) return;
+
+      // Arrays to accumulate results
+      let raterStats = {
+        A: { a:0, b:0, c:0, d:0, totalMatches: 0, missTotal: 0, faTotal: 0, possibleMiss: 0, possibleFA: 0 },
+        B: { a:0, b:0, c:0, d:0, totalMatches: 0, missTotal: 0, faTotal: 0, possibleMiss: 0, possibleFA: 0 },
+        C: { a:0, b:0, c:0, d:0, totalMatches: 0, missTotal: 0, faTotal: 0, possibleMiss: 0, possibleFA: 0 }
+      };
+
+      kappaItems.forEach(row => {
+        const std = row.std;
+
+        // Loop over the raters
+        ['a', 'b', 'c'].forEach(rKey => {
+          const uKey = rKey.toUpperCase();
+          const ratings = row[rKey];
+
+          // 1. Effectiveness checklist (Complete match of all 3 trials with STD)
+          let allMatch = ratings.every(v => v === std);
+          if (allMatch) {
+            raterStats[uKey].totalMatches++;
+          }
+
+          // 2. Crosstab count: Compare each of the 3 trials with the STD
+          ratings.forEach(val => {
+            if (std === 0) {
+              raterStats[uKey].possibleFA++;
+              if (val === 0) {
+                raterStats[uKey].a++; // OK rated OK
+              } else {
+                raterStats[uKey].b++; // OK rated NG (False Alarm)
+                raterStats[uKey].faTotal++;
+              }
+            } else { // STD === 1
+              raterStats[uKey].possibleMiss++;
+              if (val === 0) {
+                raterStats[uKey].c++; // NG rated OK (Miss)
+                raterStats[uKey].missTotal++;
+              } else {
+                raterStats[uKey].d++; // NG rated NG
+              }
+            }
+          });
+
+        });
+      });
+
+      // Calculate Kappa & updates for A, B, C
+      ['A', 'B', 'C'].forEach(rKey => {
+        const stats = raterStats[rKey];
+        const totalInspec = n * 3;
+
+        // Kappa formula components
+        // Po = (a + d) / Total
+        const po = (stats.a + stats.d) / totalInspec;
+        
+        // Pe = [ (a+b)(a+c) + (c+d)(b+d) ] / Total^2
+        const pe = ( (stats.a + stats.b) * (stats.a + stats.c) + (stats.c + stats.d) * (stats.b + stats.d) ) / (totalInspec * totalInspec);
+
+        let kappa = 0;
+        if (pe === 1 && po === 1) kappa = 1;
+        else if (pe < 1) kappa = (po - pe) / (1 - pe);
+
+        // Miss Rate & False Alarm Rate
+        const missRate = stats.possibleMiss > 0 ? (stats.missTotal / stats.possibleMiss) * 100 : 0;
+        const faRate = stats.possibleFA > 0 ? (stats.faTotal / stats.possibleFA) * 100 : 0;
+        const effectiveness = (stats.totalMatches / n) * 100;
+
+        // Update Dashboard cards
+        const lowKey = rKey.toLowerCase();
+        document.getElementById(`rater_${lowKey}_kappa`).textContent = kappa.toFixed(4);
+        document.getElementById(`rater_${lowKey}_eff`).textContent = `${effectiveness.toFixed(1)}%`;
+        document.getElementById(`rater_${lowKey}_miss`).textContent = `${missRate.toFixed(1)}%`;
+        document.getElementById(`rater_${lowKey}_alarm`).textContent = `${faRate.toFixed(1)}%`;
+
+        // Capable Assessment Text
+        let statusEl = document.getElementById(`rater_${lowKey}_status`);
+        if (kappa > 0.75) {
+          statusEl.textContent = "系統優良";
+          statusEl.className = "text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded";
+        } else if (kappa >= 0.40) {
+          statusEl.textContent = "臨界臨界";
+          statusEl.className = "text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded";
+        } else {
+          statusEl.textContent = "不合格 (加強培訓)";
+          statusEl.className = "text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded";
+        }
+      });
+
+      renderCrosstabs(raterStats);
+      updateDashboardData(raterStats);
+    }
+
+    // Render selected Crosstabs
+    function renderCrosstabs(cachedStats) {
+      if (!cachedStats) {
+        // Fallback calculations if not provided directly
+        recalculateGRR();
+        return;
+      }
+
+      const raterSelected = document.getElementById('select-crosstab-rater').value;
+      const stats = cachedStats[raterSelected];
+
+      const raterFullName = raterSelected === 'A' ? '評審員 甲' : raterSelected === 'B' ? '評審員 乙' : '評審員 丙';
+      document.getElementById('cross_rater_name').textContent = raterFullName;
+
+      // Populate elements
+      document.getElementById('cross_00').textContent = stats.a;
+      document.getElementById('cross_01').textContent = stats.c;
+      document.getElementById('cross_10').textContent = stats.b;
+      document.getElementById('cross_11').textContent = stats.d;
+
+      // Totals
+      const row0Sum = stats.a + stats.c;
+      const row1Sum = stats.b + stats.d;
+      const col0Sum = stats.a + stats.b;
+      const col1Sum = stats.c + stats.d;
+      const grandSum = row0Sum + row1Sum;
+
+      document.getElementById('cross_row0_sum').textContent = row0Sum;
+      document.getElementById('cross_row1_sum').textContent = row1Sum;
+      document.getElementById('cross_col0_sum').textContent = col0Sum;
+      document.getElementById('cross_col1_sum').textContent = col1Sum;
+      document.getElementById('cross_total_sum').textContent = grandSum;
+
+      // Quick indicator boxes
+      document.getElementById('lbl_tp').textContent = stats.d;
+      document.getElementById('lbl_tn').textContent = stats.a;
+      document.getElementById('lbl_fn').textContent = stats.c;
+      document.getElementById('lbl_fp').textContent = stats.b;
+
+      // Live LaTeX step-by-step rendering
+      updateLaTeXExplanation(stats, raterFullName);
+    }
+
+    function updateLaTeXExplanation(stats, raterName) {
+      const total = stats.a + stats.b + stats.c + stats.d;
+      if (total === 0) return;
+
+      const po = (stats.a + stats.d) / total;
+      const pePass = ((stats.a + stats.b) * (stats.a + stats.c)) / (total * total);
+      const peFail = ((stats.c + stats.d) * (stats.b + stats.d)) / (total * total);
+      const pe = pePass + peFail;
+      const kappa = (po - pe) / (1 - pe);
+
+      // Generate localized equations
+      const step1Text = `$$P_o = \\frac{a + d}{\\text{總判定數}} = \\frac{${stats.a} + ${stats.d}}{${total}} = ${po.toFixed(4)}$$`;
+      
+      const step2Text = `$$P_{e(Pass)} = \\frac{(${stats.a} + ${stats.b}) \\times (${stats.a} + ${stats.c})}{${total}^2} = ${pePass.toFixed(4)}$$
+                         $$P_{e(Fail)} = \\frac{(${stats.c} + ${stats.d}) \\times (${stats.b} + ${stats.d})}{${total}^2} = ${peFail.toFixed(4)}$$
+                         $$P_e = P_{e(Pass)} + P_{e(Fail)} = ${pe.toFixed(4)}$$`;
+      
+      const step3Text = `$$\\kappa = \\frac{P_o - P_e}{1 - P_e} = \\frac{${po.toFixed(4)} - ${pe.toFixed(4)}}{1 - ${pe.toFixed(4)}} = ${kappa.toFixed(4)}$$`;
+
+      document.getElementById('calc_po_box').innerHTML = step1Text;
+      document.getElementById('calc_pe_box').innerHTML = step2Text;
+      document.getElementById('calc_kappa_box').innerHTML = step3Text;
+
+      if (window.MathJax) {
+        MathJax.typesetPromise();
+      }
+    }
+
+    // ==================== CSV UPLOAD HANDLER ====================
+    function handleCSVUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        parseAndPopulateKappaCSV(text);
+      };
+      reader.readAsText(file);
+    }
+
+    // Simple robust CSV parser for user KAPPA.csv
+    function parseAndPopulateKappaCSV(csvText) {
+      const lines = csvText.split('\n');
+      let parsedItems = [];
+      let itemIndex = 1;
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const cols = line.split(',');
+        // Based on the format from uploaded KAPPA csv: ,Item,甲1,甲2,甲3,乙1,乙2,乙3,丙1,丙2,丙3,STD...
+        // Let's check matching columns
+        if (cols.length >= 11) {
+          const rawItem = cols[1];
+          const a1 = parseInt(cols[2]);
+          const a2 = parseInt(cols[3]);
+          const a3 = parseInt(cols[4]);
+          const b1 = parseInt(cols[5]);
+          const b2 = parseInt(cols[6]);
+          const b3 = parseInt(cols[7]);
+          const c1 = parseInt(cols[8]);
+          const c2 = parseInt(cols[9]);
+          const c3 = parseInt(cols[10]);
+          const std = parseInt(cols[11]);
+
+          // Verify parsed integers
+          if (!isNaN(a1) && !isNaN(std)) {
+            parsedItems.push({
+              item: itemIndex++,
+              id: rawItem ? rawItem.trim() : `S-${itemIndex}`,
+              a: [a1, a2, a3],
+              b: [b1, b2, b3],
+              c: [c1, c2, c3],
+              std: std
+            });
+          }
+        }
+      }
+
+      if (parsedItems.length > 0) {
+        kappaItems = parsedItems;
+        renderMainMatrix();
+        recalculateGRR();
+        showToast(`✓ 成功讀取並解析 ${parsedItems.length} 個測試樣品！`);
+      } else {
+        showToast("✕ CSV 格式不符。請上傳原廠提供的 KAPPA TEST.csv");
+      }
+    }
+
+
+    // ==================== TAB 2: SAMPLE LIBRARY MANAGING ====================
+    function renderSampleLibrary() {
+      const tbody = document.getElementById('sample-list-body');
+      tbody.innerHTML = '';
+
+      sampleLibrary.forEach((s, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 border-b border-slate-100 transition-colors";
+        
+        let diffColor = s.diff.includes('A') 
+          ? 'bg-rose-100 text-rose-800' 
+          : s.diff.includes('B') ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800';
+
+        tr.innerHTML = `
+          <td class="p-4 font-semibold text-slate-800">${s.project}</td>
+          <td class="p-4 font-mono font-bold text-indigo-600">${s.id}</td>
+          <td class="p-4">${s.type}</td>
+          <td class="p-4"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${diffColor}">${s.diff}</span></td>
+          <td class="p-4 text-xs text-slate-500 max-w-xs truncate">${s.desc}</td>
+          <td class="p-4">
+            <span class="inline-flex items-center gap-1">
+              <span class="h-2 w-2 rounded-full ${s.status === '在庫' ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+              <span class="text-xs font-semibold text-slate-700">${s.status}</span>
+            </span>
+          </td>
+          <td class="p-4 text-center">
+            <button onclick="deleteSample(${idx})" class="text-xs font-bold text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition">下架</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addNewSample() {
+      const id = prompt("請輸入新增樣品ID (例如 NG-007):", "NG-007");
+      if (!id) return;
+      const type = prompt("請輸入不良類型 (如：表面刮傷 / 混料):", "外觀髒污");
+      if (!type) return;
+      const diff = prompt("請輸入難度 (A=明顯, B=一般, C=隱蔽):", "B (一般)");
+      if (!diff) return;
+
+      sampleLibrary.push({
+        project: "專案A",
+        id: id,
+        type: type,
+        diff: diff,
+        desc: "新增測試限界樣件",
+        status: "在庫"
+      });
+      renderSampleLibrary();
+      showToast("✓ 新樣品已成功錄入樣品庫！");
+    }
+
+    function deleteSample(idx) {
+      if (confirm("確認下架該樣品？")) {
+        sampleLibrary.splice(idx, 1);
+        renderSampleLibrary();
+      }
+    }
+
+
+    // ==================== TAB 3: DAILY LOGS & PERSONNEL DASHBOARD ====================
+    function renderDailyTestLogs() {
+      const tbody = document.getElementById('test-log-body');
+      tbody.innerHTML = '';
+
+      testLogs.forEach(l => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 border-b border-slate-100 transition-colors";
+        tr.innerHTML = `
+          <td class="p-4 font-mono">${l.date}</td>
+          <td class="p-4 font-bold text-slate-800">${l.name}</td>
+          <td class="p-4 text-slate-500">${l.time}</td>
+          <td class="p-4 font-mono text-indigo-600 font-bold">${l.sampleId}</td>
+          <td class="p-4">${l.type}</td>
+          <td class="p-4">
+            <span class="px-2 py-1 rounded font-bold text-xs ${l.result === 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">
+              ${l.result === 1 ? '成功檢出 (1)' : '漏檢 (0)'}
+            </span>
+          </td>
+          <td class="p-4 text-slate-500">${l.recycle}</td>
+          <td class="p-4 text-xs text-slate-400 italic">${l.remark || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addNewTestLog() {
+      const name = prompt("檢驗員姓名:", "王大明");
+      if (!name) return;
+      const sampleId = prompt("抽測投入樣品ID:", "NG-003");
+      if (!sampleId) return;
+      const res = confirm("檢驗員是否成功判定出缺陷？ (按「確認」為檢出，按「取消」為漏檢)") ? 1 : 0;
+
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
+
+      testLogs.unshift({
+        date: dateStr,
+        name: name,
+        time: "15:30",
+        sampleId: sampleId,
+        type: "常規缺陷抽測",
+        result: res,
+        recycle: "OK",
+        remark: "日常盲測紀錄"
+      });
+      renderDailyTestLogs();
+      recalculateGRR(); // Refresh stats
+      showToast("✓ 每日抽測流水帳已更新！");
+    }
+
+    // Connects daily logs with Dashboard.csv
+    function updateDashboardData(gRRStats) {
+      const grid = document.getElementById('dashboard-personnel-grid');
+      grid.innerHTML = '';
+
+      // Create aggregated profile for personnel
+      const personnel = [
+        { name: "王大明", rKey: 'A', extraTest: 1, extraSuccess: 0 },
+        { name: "李小美", rKey: 'B', extraTest: 1, extraSuccess: 1 }
+      ];
+
+      personnel.forEach(p => {
+        // Calculate pooled statistics (Gage R&R blind tests + daily log records)
+        const rr = gRRStats[p.rKey];
+        const totalTestCount = (kappaItems.length * 3) + p.extraTest;
+        const totalPassCount = rr.a + rr.d + p.extraSuccess;
+        const correctRate = (totalPassCount / totalTestCount) * 100;
+
+        // Weakness evaluation
+        let weakness = "無明顯弱點";
+        if (rr.c > rr.b) weakness = "容易漏檢NG品 (漏檢偏高)";
+        else if (rr.b > rr.c) weakness = "容易錯判OK品 (誤警偏高)";
+        if (correctRate < 80) weakness += " • 精準度急待輔導";
+
+        const card = document.createElement('div');
+        card.className = "bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-4";
+        card.innerHTML = `
+          <div class="flex justify-between items-center">
+            <h3 class="font-bold text-slate-800 text-base">${p.name}</h3>
+            <span class="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-0.5 rounded-full">在職考核</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-white p-2.5 rounded-xl shadow-xs border border-slate-100">
+              <span class="text-[10px] text-slate-400 block">綜合測試數</span>
+              <span class="text-lg font-extrabold text-slate-800">${totalTestCount}</span>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl shadow-xs border border-slate-100">
+              <span class="text-[10px] text-slate-400 block">成功檢出</span>
+              <span class="text-lg font-extrabold text-slate-800">${totalPassCount}</span>
+            </div>
+            <div class="bg-white p-2.5 rounded-xl shadow-xs border border-slate-100">
+              <span class="text-[10px] text-slate-400 block">能力百分比</span>
+              <span class="text-lg font-extrabold text-indigo-600">${correctRate.toFixed(1)}%</span>
+            </div>
+          </div>
+          <div class="text-xs flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+            <span class="text-slate-400 font-medium">主要弱點評語:</span>
+            <span class="font-bold ${correctRate < 80 ? 'text-rose-600' : 'text-slate-700'}">${weakness}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+
+    // Global UI notifications
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-message');
+      toastMsg.textContent = message;
+      
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-24', 'opacity-0');
+      }, 3000);
+    }
+
+    // Initialize Page
+    window.onload = function() {
+      restoreDataset(); // Auto preloads dataset
+      renderSampleLibrary();
+      renderDailyTestLogs();
+    };
+  </script>
+</body>
+</html>
